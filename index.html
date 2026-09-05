@@ -11,7 +11,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root{
     --bg:#12141a;
@@ -94,25 +93,8 @@
 
   /* ---------- radar ---------- */
   .radar-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;}
-  #radarMap{height:280px;width:100%;background:#0d0e12;}
-  .radar-bar{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line);}
-  #playBtn{
-    background:var(--teal);border:none;width:32px;height:32px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
-  }
-  #playBtn svg{width:14px;height:14px;}
-  #radarTrack{flex:1;height:4px;background:var(--line);border-radius:4px;position:relative;}
-  #radarProgress{position:absolute;top:0;left:0;height:100%;background:var(--teal);border-radius:4px;width:0%;}
-  #radarTime{font-size:11px;color:var(--muted);min-width:64px;text-align:right;}
+  #radarFrame{display:block;width:100%;height:340px;border:none;background:#0d0e12;}
   .radar-empty{padding:40px 12px;text-align:center;color:var(--muted);font-size:13px;}
-  .leaflet-control-attribution{
-    background:rgba(18,20,26,0.75)!important;color:var(--muted)!important;
-    font-size:9.5px!important;padding:1px 5px!important;
-  }
-  .leaflet-control-attribution a{color:var(--muted)!important;}
-  .leaflet-baseTiles-pane{
-    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-  }
 
   /* ---------- hourly ---------- */
   .hourly-scroll{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;}
@@ -191,14 +173,8 @@
     </div>
   </div>
   <div class="radar-card">
-    <div id="radarMap"></div>
-    <div class="radar-bar">
-      <button id="playBtn">
-        <svg id="playIcon" viewBox="0 0 24 24" fill="#0b0d12"><polygon points="6,4 20,12 6,20"/></svg>
-      </button>
-      <div id="radarTrack"><div id="radarProgress"></div></div>
-      <span class="mono" id="radarTime">–</span>
-    </div>
+    <iframe id="radarFrame" title="Live precipitation radar" loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
   </div>
 
   <div class="section-title">Hourly</div>
@@ -208,10 +184,9 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.1</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.2</footer>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
 
@@ -299,7 +274,6 @@ function weatherDesc(code){
 /* ============ unit conversion + state ============ */
 let unit = localStorage.getItem('wx_unit') || 'F';
 let currentData = null;
-let map, radarLayers = [], radarIndex = 0, radarTimer = null, radarPlaying = false;
 
 function cToDisplay(c){ return unit==='F' ? Math.round(c*9/5+32) : Math.round(c); }
 function kmhToDisplay(kmh){ return unit==='F' ? Math.round(kmh*0.621371) : Math.round(kmh); }
@@ -402,7 +376,7 @@ async function loadLocation(lat, lon, label){
     currentData = data;
     render(data);
     setStatus('');
-    initRadar(lat, lon);
+    updateRadarEmbed(lat, lon);
   }catch(e){
     setStatus('Could not load weather data. Check your connection and try again.');
   }
@@ -478,71 +452,25 @@ function renderDaily(data){
   }
 }
 
-/* ============ radar ============ */
-async function initRadar(lat, lon){
-  const mapEl = document.getElementById('radarMap');
-  if(!map){
-    map = L.map(mapEl, {zoomControl:false, attributionControl:true});
-    map.attributionControl.setPrefix(false);
-    map.createPane('baseTiles'); map.getPane('baseTiles').style.zIndex = 200;
-    map.createPane('radarTiles'); map.getPane('radarTiles').style.zIndex = 300;
-  }
-  map.setView([lat, lon], 7);
-  map.eachLayer(l=>map.removeLayer(l));
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    pane:'baseTiles', subdomains:'abc', maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  L.circleMarker([lat, lon], {radius:6, color:'#f2a93b', fillColor:'#f2a93b', fillOpacity:1, weight:2}).addTo(map);
-
-  radarLayers.forEach(f=>{ if(map.hasLayer(f.layer)) map.removeLayer(f.layer); });
-  radarLayers = [];
-  if(radarTimer){ clearInterval(radarTimer); radarTimer=null; radarPlaying=false; updatePlayIcon(); }
-
-  try{
-    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-    const data = await res.json();
-    const frames = [...(data.radar.past||[]), ...(data.radar.nowcast||[])];
-    frames.forEach(f=>{
-      const layer = L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`, {pane:'radarTiles', opacity:0.65});
-      radarLayers.push({layer, time:f.time});
-    });
-    radarIndex = radarLayers.length-1;
-    showRadarFrame(radarIndex);
-    if(radarLayers.length) playRadar();
-  }catch(e){
-    document.getElementById('radarTime').textContent = 'unavailable';
-  }
+/* ============ radar (official RainViewer embed — reliable, maintained by them) ============ */
+function updateRadarEmbed(lat, lon){
+  const params = new URLSearchParams({
+    loc: `${lat},${lon},7`,
+    oFa: '0',   // don't include forecast frames, observed radar only
+    oC: '1',    // show their built-in play/pause + timeline controls
+    oU: '0',    // hide the branded URL bar
+    oCS: '1',
+    oF: '0',
+    oAP: '1',   // autoplay the loop
+    c: '3',     // color scheme (TITAN)
+    o: '83',    // overlay opacity
+    lm: '1',    // radar layer
+    layer: 'radar',
+    sm: '1',    // smoothing
+    sn: '1'     // distinct snow color
+  });
+  document.getElementById('radarFrame').src = `https://www.rainviewer.com/map.html?${params.toString()}`;
 }
-
-function showRadarFrame(i){
-  radarLayers.forEach((f,idx)=>{ if(idx!==i && map.hasLayer(f.layer)) map.removeLayer(f.layer); });
-  if(!map.hasLayer(radarLayers[i].layer)) radarLayers[i].layer.addTo(map);
-  radarIndex = i;
-  const t = new Date(radarLayers[i].time*1000);
-  document.getElementById('radarTime').textContent = t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-  document.getElementById('radarProgress').style.width = (((i+1)/radarLayers.length)*100)+'%';
-}
-
-function playRadar(){
-  radarPlaying = true; updatePlayIcon();
-  radarTimer = setInterval(()=>{
-    radarIndex = (radarIndex+1) % radarLayers.length;
-    showRadarFrame(radarIndex);
-  }, 600);
-}
-function pauseRadar(){
-  radarPlaying = false; updatePlayIcon();
-  clearInterval(radarTimer); radarTimer=null;
-}
-function updatePlayIcon(){
-  document.getElementById('playIcon').innerHTML = radarPlaying
-    ? '<rect x="5" y="4" width="5" height="16"/><rect x="14" y="4" width="5" height="16"/>'
-    : '<polygon points="6,4 20,12 6,20"/>';
-}
-document.getElementById('playBtn').addEventListener('click', ()=>{
-  if(!radarLayers.length) return;
-  radarPlaying ? pauseRadar() : playRadar();
-});
 
 /* ============ boot ============ */
 (function boot(){
