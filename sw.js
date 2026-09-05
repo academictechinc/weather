@@ -23,7 +23,7 @@ self.addEventListener('fetch', (event) => {
   const isLiveData =
     url.includes('open-meteo.com') ||
     url.includes('rainviewer.com') ||
-    url.includes('cartocdn.com') ||
+    url.includes('arcgisonline.com') ||
     url.includes('bigdatacloud.net') ||
     url.includes('openstreetmap.org');
 
