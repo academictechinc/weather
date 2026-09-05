@@ -110,6 +110,9 @@
     font-size:9.5px!important;padding:1px 5px!important;
   }
   .leaflet-control-attribution a{color:var(--muted)!important;}
+  .leaflet-baseTiles-pane{
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  }
 
   /* ---------- hourly ---------- */
   .hourly-scroll{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;}
@@ -481,14 +484,13 @@ async function initRadar(lat, lon){
   if(!map){
     map = L.map(mapEl, {zoomControl:false, attributionControl:true});
     map.attributionControl.setPrefix(false);
+    map.createPane('baseTiles'); map.getPane('baseTiles').style.zIndex = 200;
+    map.createPane('radarTiles'); map.getPane('radarTiles').style.zIndex = 300;
   }
   map.setView([lat, lon], 7);
   map.eachLayer(l=>map.removeLayer(l));
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom:16, attribution:'Tiles &copy; Esri'
-  }).addTo(map);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom:16
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    pane:'baseTiles', subdomains:'abc', maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
   }).addTo(map);
   L.circleMarker([lat, lon], {radius:6, color:'#f2a93b', fillColor:'#f2a93b', fillOpacity:1, weight:2}).addTo(map);
 
@@ -501,7 +503,7 @@ async function initRadar(lat, lon){
     const data = await res.json();
     const frames = [...(data.radar.past||[]), ...(data.radar.nowcast||[])];
     frames.forEach(f=>{
-      const layer = L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`, {opacity:0.65});
+      const layer = L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`, {pane:'radarTiles', opacity:0.65});
       radarLayers.push({layer, time:f.time});
     });
     radarIndex = radarLayers.length-1;
