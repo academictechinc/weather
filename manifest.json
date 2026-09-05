@@ -1,0 +1,13 @@
+{
+  "name": "Weather",
+  "short_name": "Weather",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12141a",
+  "theme_color": "#12141a",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
