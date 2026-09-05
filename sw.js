@@ -28,7 +28,16 @@ self.addEventListener('fetch', (event) => {
 
   if (isLiveData) return;
 
+  // Network-first for the app shell itself: always serve the latest deployed
+  // version when online, and only fall back to the cached copy if offline.
+  // This is what makes future updates show up without any manual cache-busting.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
