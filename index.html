@@ -173,8 +173,14 @@
     </div>
   </div>
   <div class="radar-card">
-    <iframe id="radarFrame" title="Live precipitation radar" loading="lazy"
-      sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+    <iframe id="radarFrame" title="Live precipitation radar"
+      allow="geolocation"></iframe>
+    <div id="radarFallback" style="display:none;padding:22px 14px;text-align:center;">
+      <div style="color:var(--muted);font-size:14px;margin-bottom:10px;">Radar didn't load.</div>
+      <a id="radarLink" href="#" target="_blank" rel="noopener"
+         style="color:var(--teal);font-size:15px;text-decoration:none;border:1px solid var(--line);
+                padding:9px 16px;border-radius:10px;display:inline-block;">Open radar &rarr;</a>
+    </div>
   </div>
 
   <div class="section-title">Hourly</div>
@@ -184,7 +190,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.3</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.4</footer>
 </div>
 
 <script>
@@ -452,24 +458,35 @@ function renderDaily(data){
   }
 }
 
-/* ============ radar (official RainViewer embed — reliable, maintained by them) ============ */
+/* ============ radar (RainViewer embed) ============ */
+let radarLoadTimer = null;
+
 function updateRadarEmbed(lat, lon){
-  const params = new URLSearchParams({
-    loc: `${lat},${lon},7`,
-    oFa: '0',   // don't include forecast frames, observed radar only
-    oC: '1',    // show their built-in play/pause + timeline controls
-    oU: '0',    // hide the branded URL bar
-    oCS: '1',
-    oF: '0',
-    oAP: '1',   // autoplay the loop
-    c: '3',     // color scheme (TITAN)
-    o: '83',    // overlay opacity
-    lm: '1',    // radar layer
-    layer: 'radar',
-    sm: '1',    // smoothing
-    sn: '1'     // distinct snow color
-  });
-  document.getElementById('radarFrame').src = `https://www.rainviewer.com/map.html?${params.toString()}`;
+  const frame = document.getElementById('radarFrame');
+  const fallback = document.getElementById('radarFallback');
+  const link = document.getElementById('radarLink');
+
+  // Minimal params only — just position and zoom.
+  const url = `https://www.rainviewer.com/map.html?loc=${lat},${lon},7`;
+  link.href = url;
+
+  fallback.style.display = 'none';
+  frame.style.display = 'block';
+
+  clearTimeout(radarLoadTimer);
+  frame.onload = () => clearTimeout(radarLoadTimer);
+  frame.onerror = () => showRadarFallback();
+
+  // If it hasn't loaded in 12s, stop spinning and offer the direct link.
+  radarLoadTimer = setTimeout(showRadarFallback, 12000);
+
+  frame.src = url;
+}
+
+function showRadarFallback(){
+  clearTimeout(radarLoadTimer);
+  document.getElementById('radarFrame').style.display = 'none';
+  document.getElementById('radarFallback').style.display = 'block';
 }
 
 /* ============ boot ============ */
