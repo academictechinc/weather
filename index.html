@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <title>Weather</title>
 <link rel="manifest" href="manifest.json">
@@ -36,12 +36,12 @@
 
   /* ---------- header ---------- */
   header{display:flex;align-items:center;gap:8px;padding:4px 0 14px;}
-  .brand{font-weight:600;font-size:15px;letter-spacing:0.2px;color:var(--muted);}
+  .brand{font-weight:600;font-size:17px;letter-spacing:0.2px;color:var(--muted);}
   .brand b{color:var(--teal);}
   .search-wrap{position:relative;flex:1;}
   #locInput{
     width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);
-    font-family:'Space Grotesk',sans-serif;font-size:14px;border-radius:10px;padding:9px 12px;
+    font-family:'Space Grotesk',sans-serif;font-size:16px;border-radius:10px;padding:11px 12px;
     outline:none;
   }
   #locInput:focus{border-color:var(--teal);}
@@ -49,7 +49,7 @@
     position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel-2);
     border:1px solid var(--line);border-radius:10px;overflow:hidden;z-index:50;display:none;
   }
-  #suggestions div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);}
+  #suggestions div{padding:11px 12px;font-size:15px;cursor:pointer;border-bottom:1px solid var(--line);}
   #suggestions div:last-child{border-bottom:none;}
   #suggestions div:hover, #suggestions div.active{background:var(--panel);color:var(--teal);}
   #suggestions .empty{color:var(--muted);cursor:default;}
@@ -68,28 +68,28 @@
     border:1px solid var(--line);border-radius:20px;padding:20px 20px 18px;margin-bottom:14px;
   }
   .place-row{display:flex;justify-content:space-between;align-items:baseline;}
-  .place-name{font-size:15px;font-weight:600;}
-  .place-time{font-size:12px;color:var(--muted);}
+  .place-name{font-size:17px;font-weight:600;}
+  .place-time{font-size:14px;color:var(--muted);}
   .now-main{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
-  .now-temp{font-size:64px;font-weight:700;line-height:1;letter-spacing:-1px;}
-  .now-temp sup{font-size:26px;font-weight:500;color:var(--muted);top:-28px;}
-  .now-desc{font-size:14px;color:var(--muted);margin-top:2px;}
+  .now-temp{font-size:72px;font-weight:700;line-height:1;letter-spacing:-1px;}
+  .now-temp sup{font-size:30px;font-weight:500;color:var(--muted);top:-32px;}
+  .now-desc{font-size:16px;color:var(--muted);margin-top:2px;}
   .now-icon{width:74px;height:74px;flex-shrink:0;}
   .stat-row{display:flex;gap:10px;margin-top:14px;}
   .stat{
     flex:1;background:rgba(0,0,0,0.18);border-radius:12px;padding:8px 6px;text-align:center;
   }
-  .stat .v{font-size:14px;font-weight:600;}
-  .stat .l{font-size:10.5px;color:var(--muted);margin-top:2px;}
+  .stat .v{font-size:17px;font-weight:600;}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px;}
   .unit-toggle{
     display:flex;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;
-    font-family:'IBM Plex Mono',monospace;font-size:11px;flex-shrink:0;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;flex-shrink:0;
   }
-  .unit-toggle button{background:none;border:none;color:var(--muted);padding:6px 8px;cursor:pointer;}
+  .unit-toggle button{background:none;border:none;color:var(--muted);padding:7px 11px;cursor:pointer;}
   .unit-toggle button.active{background:var(--teal);color:#0b0d12;font-weight:600;}
 
   /* ---------- section headers ---------- */
-  .section-title{font-size:14px;font-weight:600;color:var(--muted);margin:22px 2px 8px;}
+  .section-title{font-size:16px;font-weight:600;color:var(--muted);margin:22px 2px 8px;}
 
   /* ---------- radar ---------- */
   .radar-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;}
@@ -100,32 +100,32 @@
   .hourly-scroll{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;}
   .hourly-scroll::-webkit-scrollbar{display:none;}
   .hour-card{
-    flex:0 0 auto;width:62px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    flex:0 0 auto;width:72px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
     padding:10px 0 12px;text-align:center;
   }
-  .hour-card .t{font-size:11px;color:var(--muted);}
-  .hour-card svg{width:26px;height:26px;margin:6px 0;}
-  .hour-card .temp{font-size:14px;font-weight:600;}
-  .hour-card .pop{font-size:10px;color:var(--teal);margin-top:3px;}
+  .hour-card .t{font-size:13px;color:var(--muted);}
+  .hour-card svg{width:30px;height:30px;margin:6px 0;}
+  .hour-card .temp{font-size:17px;font-weight:600;}
+  .hour-card .pop{font-size:12px;color:var(--teal);margin-top:3px;}
 
   /* ---------- daily ---------- */
   .day-row{
-    display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line);
   }
   .day-row:last-child{border-bottom:none;}
-  .day-name{width:42px;font-size:13px;font-weight:600;flex-shrink:0;}
-  .day-icon{width:28px;height:28px;flex-shrink:0;}
-  .day-pop{width:34px;font-size:11px;color:var(--teal);flex-shrink:0;text-align:right;}
+  .day-name{width:50px;font-size:15px;font-weight:600;flex-shrink:0;}
+  .day-icon{width:32px;height:32px;flex-shrink:0;}
+  .day-pop{width:40px;font-size:13px;color:var(--teal);flex-shrink:0;text-align:right;}
   .day-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;}
-  .day-lo,.day-hi{font-size:12.5px;width:28px;flex-shrink:0;}
+  .day-lo,.day-hi{font-size:15px;width:34px;flex-shrink:0;}
   .day-lo{color:var(--muted);text-align:right;}
   .day-bar-track{flex:1;height:4px;background:var(--line);border-radius:4px;position:relative;}
   .day-bar-fill{position:absolute;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--teal),var(--amber));}
   .daily-list{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:6px 12px;}
 
   /* ---------- status / footer ---------- */
-  .status{text-align:center;color:var(--muted);font-size:12.5px;padding:24px 10px;}
-  footer{text-align:center;color:var(--line);font-size:10.5px;padding:26px 0 6px;font-family:'IBM Plex Mono',monospace;}
+  .status{text-align:center;color:var(--muted);font-size:14px;padding:24px 10px;}
+  footer{text-align:center;color:var(--line);font-size:11.5px;padding:26px 0 6px;font-family:'IBM Plex Mono',monospace;}
 
   @media (prefers-reduced-motion: reduce){
     * { transition:none !important; animation:none !important; }
@@ -184,7 +184,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.2</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.3</footer>
 </div>
 
 <script>
