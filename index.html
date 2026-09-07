@@ -113,6 +113,11 @@
     padding:9px 12px;border-top:1px solid var(--line);
   }
   .radar-foot b{color:var(--teal);font-weight:600;}
+  .radar-toggle{
+    background:var(--teal);color:#0b0d12;border:1px solid var(--teal);font-size:11px;
+    font-weight:600;padding:5px 8px;border-radius:7px;cursor:pointer;flex-shrink:0;
+  }
+  .radar-toggle.off{background:transparent;color:var(--muted);border-color:var(--line);}
   .radar-diag{
     display:none;font-size:11px;color:var(--amber);padding:8px 12px;
     border-top:1px solid var(--line);text-align:center;line-height:1.5;word-break:break-all;
@@ -209,6 +214,7 @@
       </button>
       <div id="radarTrack"><div id="radarProgress"></div></div>
       <span class="mono" id="radarTime">–</span>
+      <button id="radarToggle" class="radar-toggle mono" aria-label="Toggle radar layer">RDR</button>
     </div>
     <div id="radarDiag" class="radar-diag mono"></div>
     <a id="radarLink" class="radar-foot" href="#" target="_blank" rel="noopener">Open full radar <b>&rarr;</b></a>
@@ -221,7 +227,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.7</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.8</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -615,6 +621,20 @@ function updatePlayIcon(){
     ? '<rect x="5" y="4" width="5" height="16"/><rect x="14" y="4" width="5" height="16"/>'
     : '<polygon points="6,4 20,12 6,20"/>';
 }
+
+let radarVisible = true;
+document.getElementById('radarToggle').addEventListener('click', () => {
+  radarVisible = !radarVisible;
+  const btn = document.getElementById('radarToggle');
+  btn.classList.toggle('off', !radarVisible);
+  if(radarVisible){
+    if(radarLayers[radarIndex]) radarLayers[radarIndex].layer.addTo(map);
+  } else {
+    // Hide every radar frame — whatever is left on screen is the basemap.
+    pauseRadar();
+    radarLayers.forEach(f => { if(map.hasLayer(f.layer)) map.removeLayer(f.layer); });
+  }
+});
 
 document.getElementById('playBtn').addEventListener('click', () => {
   if(!radarLayers.length) return;
