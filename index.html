@@ -113,6 +113,10 @@
     padding:9px 12px;border-top:1px solid var(--line);
   }
   .radar-foot b{color:var(--teal);font-weight:600;}
+  .radar-diag{
+    display:none;font-size:11px;color:var(--amber);padding:8px 12px;
+    border-top:1px solid var(--line);text-align:center;line-height:1.5;word-break:break-all;
+  }
   /* Dark-mode the basemap only — radar overlay colors stay untouched. */
   .leaflet-basePane-pane{filter:invert(100%) hue-rotate(180deg) brightness(96%) contrast(88%);}
   .leaflet-control-attribution{
@@ -206,6 +210,7 @@
       <div id="radarTrack"><div id="radarProgress"></div></div>
       <span class="mono" id="radarTime">–</span>
     </div>
+    <div id="radarDiag" class="radar-diag mono"></div>
     <a id="radarLink" class="radar-foot" href="#" target="_blank" rel="noopener">Open full radar <b>&rarr;</b></a>
   </div>
 
@@ -216,7 +221,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.6</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.7</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -497,7 +502,7 @@ async function updateRadarEmbed(lat, lon){
   }
 
   if(!map){
-    map = L.map('radarMap', {zoomControl:false, attributionControl:true});
+    map = L.map('radarMap', {zoomControl:false, attributionControl:true, minZoom:3, maxZoom:11});
     map.attributionControl.setPrefix(false);
     // Separate panes so the dark CSS filter hits only the basemap.
     map.createPane('basePane');  map.getPane('basePane').style.zIndex  = 200;
@@ -526,8 +531,16 @@ async function updateRadarEmbed(lat, lon){
 
     frames.forEach(f => {
       const layer = L.tileLayer(
-        `${data.host}${f.path}/256/{z}/{x}/{y}/4/1_1.png`,
-        {pane:'radarPane', opacity:0.7, maxZoom:19}
+        `${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`,
+        {
+          pane:'radarPane',
+          opacity:0.65,
+          // RainViewer only serves radar tiles up to ~zoom 10. Without
+          // maxNativeZoom, Leaflet requests higher zooms and the server
+          // returns "Zoom Level Not Supported" placeholder tiles.
+          maxNativeZoom:10,
+          maxZoom:19
+        }
       );
       radarLayers.push({layer, time:f.time});
     });
@@ -535,8 +548,37 @@ async function updateRadarEmbed(lat, lon){
     radarIndex = radarLayers.length - 1;
     showRadarFrame(radarIndex);
     playRadar();
+    // Probe one real tile and report the actual HTTP status on screen,
+    // so a failure names itself instead of needing to be guessed at.
+    probeRadarTile(data.host, frames[frames.length-1].path, lat, lon);
   }catch(e){
     document.getElementById('radarTime').textContent = 'unavailable';
+    showDiag('radar index failed: ' + e.message);
+  }
+}
+
+function showDiag(msg){
+  const el = document.getElementById('radarDiag');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function probeRadarTile(host, path, lat, lon){
+  const z = 7;
+  const x = Math.floor((lon + 180) / 360 * Math.pow(2, z));
+  const latRad = lat * Math.PI / 180;
+  const y = Math.floor(
+    (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, z)
+  );
+  const url = `${host}${path}/256/${z}/${x}/${y}/3/1_1.png`;
+  try{
+    const r = await fetch(url, {cache:'no-store'});
+    const kb = (await r.blob()).size / 1024;
+    if(!r.ok || kb < 0.3){
+      showDiag(`tile ${r.status} · ${kb.toFixed(1)}KB · ${url}`);
+    }
+  }catch(err){
+    showDiag('tile blocked: ' + err.message + ' · ' + url);
   }
 }
 
