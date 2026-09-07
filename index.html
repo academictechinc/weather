@@ -113,15 +113,6 @@
     padding:9px 12px;border-top:1px solid var(--line);
   }
   .radar-foot b{color:var(--teal);font-weight:600;}
-  .radar-toggle{
-    background:var(--teal);color:#0b0d12;border:1px solid var(--teal);font-size:11px;
-    font-weight:600;padding:5px 8px;border-radius:7px;cursor:pointer;flex-shrink:0;
-  }
-  .radar-toggle.off{background:transparent;color:var(--muted);border-color:var(--line);}
-  .radar-diag{
-    display:none;font-size:11px;color:var(--amber);padding:8px 12px;
-    border-top:1px solid var(--line);text-align:center;line-height:1.5;word-break:break-all;
-  }
   /* Dark-mode the basemap only — radar overlay colors stay untouched. */
   .leaflet-basePane-pane{filter:invert(100%) hue-rotate(180deg) brightness(96%) contrast(88%);}
   .leaflet-control-attribution{
@@ -214,9 +205,7 @@
       </button>
       <div id="radarTrack"><div id="radarProgress"></div></div>
       <span class="mono" id="radarTime">–</span>
-      <button id="radarToggle" class="radar-toggle mono" aria-label="Toggle radar layer">RDR</button>
     </div>
-    <div id="radarDiag" class="radar-diag mono"></div>
     <a id="radarLink" class="radar-foot" href="#" target="_blank" rel="noopener">Open full radar <b>&rarr;</b></a>
   </div>
 
@@ -227,7 +216,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.8</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.9</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -508,13 +497,20 @@ async function updateRadarEmbed(lat, lon){
   }
 
   if(!map){
-    map = L.map('radarMap', {zoomControl:false, attributionControl:true, minZoom:3, maxZoom:11});
+    map = L.map('radarMap', {
+      zoomControl:false, attributionControl:true,
+      // Hard zoom ceiling. RainViewer serves radar tiles to ~z10 and OSM to
+      // z19, so capping the MAP at 9 means neither server is ever asked for a
+      // zoom it doesn't have. That is what produced the placeholder tiles.
+      minZoom:4, maxZoom:9,
+      bounceAtZoomLimits:false
+    });
     map.attributionControl.setPrefix(false);
     // Separate panes so the dark CSS filter hits only the basemap.
     map.createPane('basePane');  map.getPane('basePane').style.zIndex  = 200;
     map.createPane('radarPane'); map.getPane('radarPane').style.zIndex = 400;
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      pane:'basePane', maxZoom:19, attribution:'&copy; OpenStreetMap'
+      pane:'basePane', minZoom:4, maxZoom:9, attribution:'&copy; OpenStreetMap'
     }).addTo(map);
   }
   map.setView([lat, lon], 7);
@@ -538,15 +534,7 @@ async function updateRadarEmbed(lat, lon){
     frames.forEach(f => {
       const layer = L.tileLayer(
         `${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`,
-        {
-          pane:'radarPane',
-          opacity:0.65,
-          // RainViewer only serves radar tiles up to ~zoom 10. Without
-          // maxNativeZoom, Leaflet requests higher zooms and the server
-          // returns "Zoom Level Not Supported" placeholder tiles.
-          maxNativeZoom:10,
-          maxZoom:19
-        }
+        {pane:'radarPane', opacity:0.65, minZoom:4, maxZoom:9}
       );
       radarLayers.push({layer, time:f.time});
     });
@@ -554,92 +542,10 @@ async function updateRadarEmbed(lat, lon){
     radarIndex = radarLayers.length - 1;
     showRadarFrame(radarIndex);
     playRadar();
-    // Probe one real tile and report the actual HTTP status on screen,
-    // so a failure names itself instead of needing to be guessed at.
-    probeRadarTile(data.host, frames[frames.length-1].path, lat, lon);
   }catch(e){
     document.getElementById('radarTime').textContent = 'unavailable';
-    showDiag('radar index failed: ' + e.message);
   }
 }
-
-function showDiag(msg){
-  const el = document.getElementById('radarDiag');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-async function probeRadarTile(host, path, lat, lon){
-  const z = 7;
-  const x = Math.floor((lon + 180) / 360 * Math.pow(2, z));
-  const latRad = lat * Math.PI / 180;
-  const y = Math.floor(
-    (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, z)
-  );
-  const url = `${host}${path}/256/${z}/${x}/${y}/3/1_1.png`;
-  try{
-    const r = await fetch(url, {cache:'no-store'});
-    const kb = (await r.blob()).size / 1024;
-    if(!r.ok || kb < 0.3){
-      showDiag(`tile ${r.status} · ${kb.toFixed(1)}KB · ${url}`);
-    }
-  }catch(err){
-    showDiag('tile blocked: ' + err.message + ' · ' + url);
-  }
-}
-
-function showRadarFrame(i){
-  if(!radarLayers.length) return;
-  radarLayers.forEach((f, idx) => {
-    if(idx !== i && map.hasLayer(f.layer)) map.removeLayer(f.layer);
-  });
-  if(!map.hasLayer(radarLayers[i].layer)) radarLayers[i].layer.addTo(map);
-  radarIndex = i;
-  const t = new Date(radarLayers[i].time * 1000);
-  document.getElementById('radarTime').textContent =
-    t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
-  document.getElementById('radarProgress').style.width =
-    (((i + 1) / radarLayers.length) * 100) + '%';
-}
-
-function playRadar(){
-  if(!radarLayers.length) return;
-  radarPlaying = true; updatePlayIcon();
-  clearInterval(radarTimer);
-  radarTimer = setInterval(() => {
-    showRadarFrame((radarIndex + 1) % radarLayers.length);
-  }, 650);
-}
-
-function pauseRadar(){
-  radarPlaying = false; updatePlayIcon();
-  clearInterval(radarTimer); radarTimer = null;
-}
-
-function updatePlayIcon(){
-  document.getElementById('playIcon').innerHTML = radarPlaying
-    ? '<rect x="5" y="4" width="5" height="16"/><rect x="14" y="4" width="5" height="16"/>'
-    : '<polygon points="6,4 20,12 6,20"/>';
-}
-
-let radarVisible = true;
-document.getElementById('radarToggle').addEventListener('click', () => {
-  radarVisible = !radarVisible;
-  const btn = document.getElementById('radarToggle');
-  btn.classList.toggle('off', !radarVisible);
-  if(radarVisible){
-    if(radarLayers[radarIndex]) radarLayers[radarIndex].layer.addTo(map);
-  } else {
-    // Hide every radar frame — whatever is left on screen is the basemap.
-    pauseRadar();
-    radarLayers.forEach(f => { if(map.hasLayer(f.layer)) map.removeLayer(f.layer); });
-  }
-});
-
-document.getElementById('playBtn').addEventListener('click', () => {
-  if(!radarLayers.length) return;
-  radarPlaying ? pauseRadar() : playRadar();
-});
 
 /* ============ boot ============ */
 (function boot(){
