@@ -222,12 +222,32 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.12</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.14</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
+
+/* ============ RADAR SOURCE CONFIG ============================================
+   Tile layers load as <img> requests, so an API key CANNOT be sent as a header.
+   It has to live in the URL. Set the values below and nothing else changes.
+
+   To switch to MyRadar:
+     provider: 'custom'
+     tileUrl:  paste their template, keep the {z}/{x}/{y} placeholders literal,
+               and put the key right in the string.
+     maxNative: the deepest zoom their tiles actually exist at (from their docs).
+
+   Example shape (NOT verified — replace with the real one from the docs):
+     tileUrl: 'https://api.myradar.dev/tiles/radar/{z}/{x}/{y}.png?key=YOUR_KEY'
+============================================================================= */
+const RADAR = {
+  provider: 'rainviewer',   // 'rainviewer' | 'custom'
+  tileUrl:  '',             // used only when provider === 'custom'
+  maxNative: 12,            // deepest zoom the provider really serves
+  opacity: 1
+};
 
 /* ============ weather icon set (inline SVG, brand palette) ============ */
 const TEAL='#4fd8c4', AMBER='#f2a93b', CLOUD='#9aa1b5', SKY='#3a4058';
@@ -526,6 +546,25 @@ async function updateRadarEmbed(lat, lon){
     radius:6, color:'#f2a93b', fillColor:'#f2a93b', fillOpacity:1, weight:2
   }).addTo(map);
 
+  // --- Custom provider (e.g. MyRadar): one static tile URL, no frame index ---
+  if(RADAR.provider === 'custom'){
+    if(!RADAR.tileUrl){
+      document.getElementById('radarTime').textContent = 'no tile URL set';
+      return;
+    }
+    const layer = L.tileLayer(RADAR.tileUrl, {
+      pane:'radarPane', opacity:RADAR.opacity,
+      minZoom:3, maxZoom:17, maxNativeZoom:RADAR.maxNative,
+      errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    }).addTo(map);
+    radarLayers = [{layer, time: Date.now()/1000}];
+    radarIndex = 0;
+    document.getElementById('radarTime').textContent = 'live';
+    document.getElementById('radarProgress').style.width = '100%';
+    return;
+  }
+
+  // --- RainViewer: fetch the frame index, then build one layer per frame ---
   try{
     const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
     if(!res.ok) throw new Error('radar index ' + res.status);
@@ -537,12 +576,12 @@ async function updateRadarEmbed(lat, lon){
       const layer = L.tileLayer(
         `${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`,
         {
-          pane:'radarPane', opacity:1,
+          pane:'radarPane', opacity:RADAR.opacity,
           minZoom:3, maxZoom:17,
           // RainViewer's own map zooms in fully, so their tiles go deeper than
           // I first assumed. Past this, Leaflet upscales instead of requesting
           // a zoom the server may not stock.
-          maxNativeZoom:12,
+          maxNativeZoom:RADAR.maxNative,
           errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
         }
       );
@@ -553,7 +592,10 @@ async function updateRadarEmbed(lat, lon){
     showRadarFrame(radarIndex);
     playRadar();
   }catch(e){
-    document.getElementById('radarTime').textContent = 'unavailable';
+    // Surface the real reason, not just "unavailable".
+    document.getElementById('radarTime').textContent = 'error';
+    const foot = document.getElementById('radarLink');
+    foot.textContent = 'Radar API: ' + e.message + ' — open full radar →';
   }
 }
 
