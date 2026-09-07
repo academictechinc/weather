@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-app-v11';
+const CACHE_NAME = 'weather-app-v12';
 const SHELL_ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -23,7 +23,6 @@ self.addEventListener('fetch', (event) => {
   const isLiveData =
     url.includes('open-meteo.com') ||
     url.includes('rainviewer.com') ||
-    url.includes('openstreetmap.org') ||
     url.includes('bigdatacloud.net');
 
   if (isLiveData) return;
