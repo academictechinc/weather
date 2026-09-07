@@ -223,7 +223,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.10</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.11</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -506,10 +506,10 @@ async function updateRadarEmbed(lat, lon){
   if(!map){
     map = L.map('radarMap', {
       zoomControl:true, attributionControl:true,
-      // Zoom to 14. Each layer below declares maxNativeZoom for what its
-      // server actually stocks; Leaflet upscales past that instead of
-      // requesting a tile that doesn't exist (the placeholder-tile bug).
-      minZoom:3, maxZoom:14,
+      // Full zoom depth. Each layer sets maxNativeZoom to what its server
+      // actually stocks; Leaflet upscales beyond that rather than requesting
+      // a tile that doesn't exist.
+      minZoom:3, maxZoom:17,
       bounceAtZoomLimits:false
     });
     map.attributionControl.setPrefix(false);
@@ -517,7 +517,9 @@ async function updateRadarEmbed(lat, lon){
     map.createPane('basePane');  map.getPane('basePane').style.zIndex  = 200;
     map.createPane('radarPane'); map.getPane('radarPane').style.zIndex = 400;
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      pane:'basePane', minZoom:3, maxZoom:14, maxNativeZoom:14,
+      pane:'basePane', minZoom:3, maxZoom:17, maxNativeZoom:18,
+      // Transparent 1x1: a failed tile shows nothing rather than an error image.
+      errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
       attribution:'&copy; OpenStreetMap'
     }).addTo(map);
   }
@@ -544,10 +546,12 @@ async function updateRadarEmbed(lat, lon){
         `${data.host}${f.path}/256/{z}/{x}/{y}/3/1_1.png`,
         {
           pane:'radarPane', opacity:0.65,
-          minZoom:3, maxZoom:14,
-          // RainViewer's radar data itself stops around z10 — beyond this
-          // Leaflet scales the z10 tile up rather than asking for z11+.
-          maxNativeZoom:10
+          minZoom:3, maxZoom:17,
+          // RainViewer's own map zooms in fully, so their tiles go deeper than
+          // I first assumed. Past this, Leaflet upscales instead of requesting
+          // a zoom the server may not stock.
+          maxNativeZoom:12,
+          errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
         }
       );
       radarLayers.push({layer, time:f.time});
