@@ -222,7 +222,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.15 (no-sw)</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.16</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -598,6 +598,48 @@ async function updateRadarEmbed(lat, lon){
     foot.textContent = 'Radar API: ' + e.message + ' — open full radar →';
   }
 }
+
+/* ============ radar playback ============ */
+function showRadarFrame(i){
+  if(!radarLayers.length) return;
+  radarLayers.forEach((f, idx) => {
+    if(idx !== i && map.hasLayer(f.layer)) map.removeLayer(f.layer);
+  });
+  if(!map.hasLayer(radarLayers[i].layer)) radarLayers[i].layer.addTo(map);
+  radarIndex = i;
+  const t = new Date(radarLayers[i].time * 1000);
+  document.getElementById('radarTime').textContent =
+    t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  document.getElementById('radarProgress').style.width =
+    (((i + 1) / radarLayers.length) * 100) + '%';
+}
+
+function playRadar(){
+  if(radarLayers.length < 2) return;
+  radarPlaying = true; updatePlayIcon();
+  clearInterval(radarTimer);
+  radarTimer = setInterval(() => {
+    showRadarFrame((radarIndex + 1) % radarLayers.length);
+  }, 650);
+}
+
+function pauseRadar(){
+  radarPlaying = false; updatePlayIcon();
+  clearInterval(radarTimer); radarTimer = null;
+}
+
+function updatePlayIcon(){
+  const icon = document.getElementById('playIcon');
+  if(!icon) return;
+  icon.innerHTML = radarPlaying
+    ? '<rect x="5" y="4" width="5" height="16"/><rect x="14" y="4" width="5" height="16"/>'
+    : '<polygon points="6,4 20,12 6,20"/>';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if(!radarLayers.length) return;
+  radarPlaying ? pauseRadar() : playRadar();
+});
 
 /* ============ boot ============ */
 (function boot(){
