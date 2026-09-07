@@ -222,7 +222,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.14</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.15 (no-sw)</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -627,10 +627,18 @@ async function updateRadarEmbed(lat, lon){
   }
 })();
 
+// Service worker removed. It was intercepting and caching requests, which
+// served stale tiles and could block live API calls. Actively unregister any
+// copy still installed from a previous build, and clear its caches.
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then(regs => regs.forEach(r => r.unregister()))
+    .catch(()=>{});
+}
+if(window.caches){
+  caches.keys().then(keys => keys.forEach(k => {
+    if(k.startsWith('weather-app')) caches.delete(k);
+  })).catch(()=>{});
 }
 
 })();
