@@ -100,6 +100,8 @@
   .radar-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;}
   #radarMap{height:300px;width:100%;background:#0d0e12;}
   .leaflet-container{background:#0d0e12!important;}
+  /* Darken the basemap only — the radar pane is untouched so rain stays vivid. */
+  .leaflet-basePane-pane{filter:invert(100%) hue-rotate(180deg) brightness(92%) contrast(88%);}
   .radar-bar{display:flex;align-items:center;gap:10px;padding:11px 12px;border-top:1px solid var(--line);}
   #playBtn{
     background:var(--teal);border:none;width:36px;height:36px;border-radius:50%;
@@ -222,7 +224,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.16</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.17</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -246,7 +248,7 @@ const RADAR = {
   provider: 'rainviewer',   // 'rainviewer' | 'custom'
   tileUrl:  '',             // used only when provider === 'custom'
   maxNative: 12,            // deepest zoom the provider really serves
-  opacity: 1
+  opacity: 0.8
 };
 
 /* ============ weather icon set (inline SVG, brand palette) ============ */
@@ -532,8 +534,16 @@ async function updateRadarEmbed(lat, lon){
       bounceAtZoomLimits:false
     });
     map.attributionControl.setPrefix(false);
-    // No basemap — radar renders straight onto the dark app background.
+    // Two panes: the CSS filter darkens ONLY the basemap pane, so radar
+    // colors render true on top of it.
+    map.createPane('basePane');  map.getPane('basePane').style.zIndex  = 200;
     map.createPane('radarPane'); map.getPane('radarPane').style.zIndex = 400;
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      pane:'basePane',
+      minZoom:3, maxZoom:17, maxNativeZoom:17,
+      errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+      attribution:'&copy; OpenStreetMap'
+    }).addTo(map);
   }
   map.setView([lat, lon], 7);
 
