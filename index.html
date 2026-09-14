@@ -101,7 +101,8 @@
   #radarMap{height:300px;width:100%;background:#0d0e12;}
   .leaflet-container{background:#0d0e12!important;}
   /* Darken the basemap only — the radar pane is untouched so rain stays vivid. */
-  .leaflet-basePane-pane{filter:invert(100%) hue-rotate(180deg) brightness(92%) contrast(88%);}
+  /* Leaflet strips "Pane" from the pane name: 'basePane' -> .leaflet-base-pane */
+  .leaflet-base-pane{filter:invert(100%) hue-rotate(180deg) brightness(92%) contrast(88%);}
   .radar-bar{display:flex;align-items:center;gap:10px;padding:11px 12px;border-top:1px solid var(--line);}
   #playBtn{
     background:var(--teal);border:none;width:36px;height:36px;border-radius:50%;
@@ -224,7 +225,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.17</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.18</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -468,15 +469,25 @@ function render(data){
 function renderHourly(data){
   const wrap = document.getElementById('hourlyScroll');
   wrap.innerHTML='';
-  const nowIso = new Date().toISOString().slice(0,13);
-  let startIdx = data.hourly.time.findIndex(t=>t.slice(0,13)===nowIso);
-  if(startIdx<0) startIdx=0;
+  // Open-Meteo returns hourly times in the LOCATION's local timezone, and
+  // current.time in that same timezone. Match against that — using
+  // toISOString() here compares UTC to local and lands hours off.
+  const nowLocal = (data.current && data.current.time)
+    ? data.current.time.slice(0,13)
+    : null;
+  let startIdx = nowLocal ? data.hourly.time.findIndex(t => t.slice(0,13) === nowLocal) : -1;
+  if(startIdx < 0) startIdx = 0;
   for(let i=startIdx; i<Math.min(startIdx+30, data.hourly.time.length); i++){
-    const t = new Date(data.hourly.time[i]);
+    // "2026-09-13T19:00" — take the hour from the string itself, in the
+    // location's timezone, rather than reparsing through the device clock.
+    const hh = parseInt(data.hourly.time[i].slice(11,13), 10);
+    const ampm = hh < 12 ? 'AM' : 'PM';
+    const h12 = hh % 12 === 0 ? 12 : hh % 12;
+    const label = i === startIdx ? 'Now' : `${h12} ${ampm}`;
     const card = document.createElement('div');
     card.className='hour-card';
     card.innerHTML = `
-      <div class="t mono">${i===startIdx?'Now':t.toLocaleTimeString([],{hour:'numeric'})}</div>
+      <div class="t mono">${label}</div>
       ${weatherIcon(data.hourly.weather_code[i], data.hourly.is_day[i]===1, 26)}
       <div class="temp">${cToDisplay(data.hourly.temperature_2m[i])}°</div>
       <div class="pop mono">${data.hourly.precipitation_probability[i]}%</div>
