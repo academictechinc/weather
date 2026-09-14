@@ -225,7 +225,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.18</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.19</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -402,11 +402,15 @@ document.getElementById('locBtn').addEventListener('click', ()=>{
     try{
       const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
       const d = await r.json();
-      label = [d.city||d.locality, d.principalSubdivisionCode ? d.principalSubdivisionCode.split('-')[1]||d.principalSubdivision : d.principalSubdivision].filter(Boolean).join(', ') || label;
+      // locality is the actual town (Pearl); city is often the metro name (Jackson).
+      const town = d.locality || d.city;
+      const st = d.principalSubdivisionCode ? (d.principalSubdivisionCode.split('-')[1] || d.principalSubdivision) : d.principalSubdivision;
+      label = [town, st].filter(Boolean).join(', ') || label;
     }catch(e){}
     locInput.value = label;
     loadLocation(latitude, longitude, label);
-  }, ()=>{ setStatus('Location access denied — search for a city instead.'); });
+  }, ()=>{ setStatus('Location access denied — search for a city instead.'); },
+  {enableHighAccuracy:true, timeout:15000, maximumAge:0});
 });
 
 /* ============ unit toggle ============ */
@@ -678,13 +682,15 @@ document.getElementById('playBtn').addEventListener('click', () => {
       try{
         const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
         const d = await r.json();
-        label = [d.city||d.locality, d.principalSubdivision].filter(Boolean).join(', ') || label;
+        const town = d.locality || d.city;
+        const st = d.principalSubdivisionCode ? (d.principalSubdivisionCode.split('-')[1] || d.principalSubdivision) : d.principalSubdivision;
+        label = [town, st].filter(Boolean).join(', ') || label;
       }catch(e){}
       locInput.value = label;
       loadLocation(latitude, longitude, label);
     }, ()=>{
       setStatus('Search for a city to get started.');
-    });
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
   } else {
     setStatus('Search for a city to get started.');
   }
