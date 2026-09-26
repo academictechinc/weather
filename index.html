@@ -86,6 +86,14 @@
   .now-icon{width:74px;height:74px;flex-shrink:0;}
   .stat-row{display:flex;gap:10px;margin-top:14px;}
   .sun-row{display:flex;align-items:flex-end;gap:8px;margin-top:16px;}
+  .jeep-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:12px;
+  }
+  .jeep-svg{width:112px;height:54px;flex-shrink:0;}
+  .jeep-text{min-width:0;}
+  .jeep-verdict{font-size:16px;font-weight:600;}
+  .jeep-why{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45;}
   .sun-arc{flex:1;height:52px;}
   .sun-end{text-align:center;min-width:62px;}
   .sun-t{font-size:14px;font-weight:600;}
@@ -228,6 +236,14 @@
     </div>
   </div>
 
+  <div class="jeep-card">
+    <svg id="jeepSvg" viewBox="0 0 250 120" class="jeep-svg"></svg>
+    <div class="jeep-text">
+      <div class="jeep-verdict" id="jeepVerdict">–</div>
+      <div class="jeep-why" id="jeepWhy">–</div>
+    </div>
+  </div>
+
   <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
     <span>Radar</span>
     <div class="unit-toggle" id="unitToggle">
@@ -253,7 +269,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.22</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.23</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -508,11 +524,117 @@ function render(data){
     cToDisplay(data.daily.temperature_2m_max[0])+'° / '+cToDisplay(data.daily.temperature_2m_min[0])+'°';
 
   renderSun(data);
+  updateJeep(data);
   if(window.setAmbient){
     window.setAmbient(c.weather_code, c.is_day === 1, c.temperature_2m);
   }
   renderHourly(data);
   renderDaily(data);
+}
+
+
+/* ============ TJ top-check ============
+   Side-view Wrangler TJ: round headlights, 7-slot grille, flat fenders.
+   Picks a top based on temperature and near-term rain. */
+function drawJeep(state){
+  const BODY  = '#4fd8c4';
+  const DARK  = '#2a2f3d';
+  const TIRE  = '#1b1e27';
+  const GLASS = 'rgba(200,225,240,0.30)';
+  const SOFT  = '#f2a93b';
+  const HARD  = '#8a90a3';
+
+  // Shared lower body: tub, fenders, wheels, round headlight, 7-slot grille.
+  const base = `
+    <path d="M28 74 L28 60 Q28 56 32 56 L44 56 Q50 40 66 40 L150 40 Q166 40 176 52 L208 56 Q218 58 218 66 L218 74 Q218 80 212 80 L34 80 Q28 80 28 74 Z"
+          fill="${BODY}"/>
+    <rect x="196" y="52" width="22" height="9" rx="3" fill="${BODY}"/>
+    <circle cx="210" cy="62" r="5.5" fill="#fff6dd" stroke="${DARK}" stroke-width="1.6"/>
+    ${[0,1,2,3,4,5,6].map(i=>`<rect x="${199+i*2.7}" y="47" width="1.5" height="8" rx="0.6" fill="${DARK}" opacity="0.65"/>`).join('')}
+    <path d="M44 80 a26 26 0 0 1 52 0 Z" fill="var(--panel)"/>
+    <path d="M148 80 a26 26 0 0 1 52 0 Z" fill="var(--panel)"/>
+    <circle cx="70" cy="82" r="19" fill="${TIRE}"/>
+    <circle cx="70" cy="82" r="8"  fill="${DARK}"/>
+    <circle cx="70" cy="82" r="3.4" fill="${BODY}"/>
+    <circle cx="174" cy="82" r="19" fill="${TIRE}"/>
+    <circle cx="174" cy="82" r="8"  fill="${DARK}"/>
+    <circle cx="174" cy="82" r="3.4" fill="${BODY}"/>
+    <rect x="26" y="58" width="5" height="16" rx="2" fill="${DARK}"/>
+  `;
+
+  let top = '';
+  if(state === 'open'){
+    // Windshield up, no top, roll bar exposed.
+    top = `
+      <path d="M150 40 L142 16 L136 16 L140 40 Z" fill="${DARK}"/>
+      <path d="M148 38 L141.5 18 L138 18 L143 38 Z" fill="${GLASS}"/>
+      <path d="M96 40 L96 20 Q96 17 99 17 L118 17" fill="none" stroke="${DARK}" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M96 22 L120 22" stroke="${DARK}" stroke-width="3" stroke-linecap="round"/>
+    `;
+  } else if(state === 'soft'){
+    // Canvas top: sagging curve from windshield header to tailgate.
+    top = `
+      <path d="M150 40 L142 16 L136 16 L140 40 Z" fill="${DARK}"/>
+      <path d="M141 16 Q120 10 98 15 Q86 18 84 40 L140 40 Z" fill="${SOFT}" opacity="0.92"/>
+      <path d="M133 19 Q120 15 106 18 L104 34 L131 34 Z" fill="${GLASS}"/>
+      <path d="M141 16 Q120 10 98 15" fill="none" stroke="${DARK}" stroke-width="1.6" opacity="0.5"/>
+      <path d="M118 12.5 L114 40" stroke="${DARK}" stroke-width="1.2" opacity="0.35"/>
+    `;
+  } else {
+    // Hardtop: squared roofline with a defined side window.
+    top = `
+      <path d="M150 40 L142 16 L136 16 L140 40 Z" fill="${DARK}"/>
+      <path d="M141 16 L92 16 Q86 16 86 22 L86 40 L140 40 Z" fill="${HARD}"/>
+      <rect x="96" y="21" width="36" height="14" rx="2.5" fill="${GLASS}"/>
+      <path d="M141 16 L92 16" stroke="${DARK}" stroke-width="1.6" opacity="0.6"/>
+      <rect x="86" y="37" width="55" height="3" fill="${DARK}" opacity="0.35"/>
+    `;
+  }
+
+  document.getElementById('jeepSvg').innerHTML = base + top;
+}
+
+function updateJeep(data){
+  const c = data.current;
+  const tempF = c.temperature_2m * 9/5 + 32;
+  const highF = data.daily.temperature_2m_max[0] * 9/5 + 32;
+
+  // Rain within roughly the next 12 hours.
+  let popNext = 0, rainSoon = false;
+  const nowLocal = (c.time || '').slice(0,13);
+  let idx = data.hourly.time.findIndex(t => t.slice(0,13) === nowLocal);
+  if(idx < 0) idx = 0;
+  for(let i = idx; i < Math.min(idx+12, data.hourly.time.length); i++){
+    popNext = Math.max(popNext, data.hourly.precipitation_probability[i] || 0);
+    const wc = data.hourly.weather_code[i];
+    if([51,53,55,61,63,65,66,67,80,81,82,95,96,99].includes(wc)) rainSoon = true;
+  }
+  const rainingNow = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(c.weather_code);
+  const snowing = [71,73,75,77,85,86].includes(c.weather_code);
+
+  let state, verdict, why;
+  if(tempF < 50 || highF < 58 || snowing){
+    state = 'hard';
+    verdict = 'Hardtop weather';
+    why = snowing ? 'Snow falling — leave it buttoned up.'
+                  : `Only ${Math.round(tempF)}° out, high of ${Math.round(highF)}°. Too cold to be open.`;
+  } else if(rainingNow){
+    state = 'soft';
+    verdict = 'Soft top — rain now';
+    why = `It's raining. ${popNext}% chance sticking around the next 12 hours.`;
+  } else if(rainSoon || popNext >= 40){
+    state = 'soft';
+    verdict = 'Soft top — rain coming';
+    why = `${popNext}% chance within 12 hours. Wouldn't risk it.`;
+  } else {
+    state = 'open';
+    verdict = 'Top off today';
+    why = `${Math.round(tempF)}° and only ${popNext}% rain chance. Go for it.`;
+  }
+
+  drawJeep(state);
+  document.getElementById('jeepVerdict').textContent = verdict;
+  document.getElementById('jeepWhy').textContent = why;
 }
 
 function renderSun(data){
