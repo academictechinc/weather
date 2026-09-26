@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-app-v19';
+const CACHE_NAME = 'weather-app-v22';
 const SHELL_ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (event) => {
