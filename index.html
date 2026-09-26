@@ -37,7 +37,11 @@
     text-size-adjust:100%;
   }
   .mono{font-family:'IBM Plex Mono',monospace;}
-  #app{width:100%;max-width:520px;margin:0 auto;padding:16px 16px 0;overflow-x:hidden;}
+  #app{width:100%;max-width:520px;margin:0 auto;padding:16px 16px 0;overflow-x:hidden;
+       position:relative;z-index:1;}
+  #wxCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;}
+  #wxTint{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;
+          transition:opacity 1.2s ease, background 1.2s ease;}
 
   /* ---------- header ---------- */
   header{display:flex;align-items:center;gap:8px;padding:4px 0 14px;}
@@ -81,6 +85,12 @@
   .now-desc{font-size:16px;color:var(--muted);margin-top:2px;}
   .now-icon{width:74px;height:74px;flex-shrink:0;}
   .stat-row{display:flex;gap:10px;margin-top:14px;}
+  .sun-row{display:flex;align-items:flex-end;gap:8px;margin-top:16px;}
+  .sun-arc{flex:1;height:52px;}
+  .sun-end{text-align:center;min-width:62px;}
+  .sun-t{font-size:14px;font-weight:600;}
+  .sun-l{font-size:11px;color:var(--muted);margin-top:2px;}
+  #sunDot{filter:drop-shadow(0 0 6px rgba(242,169,59,0.9));}
   .stat{
     flex:1;background:rgba(0,0,0,0.18);border-radius:12px;padding:8px 6px;text-align:center;
   }
@@ -167,6 +177,8 @@
 </style>
 </head>
 <body>
+<canvas id="wxCanvas"></canvas>
+<div id="wxTint"></div>
 <div id="app">
 
   <header>
@@ -198,6 +210,22 @@
       <div class="stat"><div class="v" id="statWind">–</div><div class="l">Wind</div></div>
       <div class="stat"><div class="v" id="statPop">–</div><div class="l">Precip</div></div>
     </div>
+    <div class="sun-row">
+      <div class="sun-end">
+        <div class="sun-t mono" id="sunriseT">–</div>
+        <div class="sun-l">Sunrise</div>
+      </div>
+      <svg class="sun-arc" viewBox="0 0 200 64" preserveAspectRatio="none">
+        <path d="M6 58 A 94 52 0 0 1 194 58" fill="none" stroke="#2a2f3d" stroke-width="2.5" stroke-linecap="round"/>
+        <path id="sunArcFill" d="M6 58 A 94 52 0 0 1 194 58" fill="none" stroke="#f2a93b"
+              stroke-width="2.5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000"/>
+        <circle id="sunDot" cx="6" cy="58" r="5" fill="#f2a93b"/>
+      </svg>
+      <div class="sun-end">
+        <div class="sun-t mono" id="sunsetT">–</div>
+        <div class="sun-l">Sunset</div>
+      </div>
+    </div>
   </div>
 
   <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -225,7 +253,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.19</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.22</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -349,6 +377,33 @@ function setStatus(msg){
   el.style.display='block'; el.textContent = msg;
 }
 
+
+/* ============ place-name helper ============
+   Free reverse geocoders sometimes return an administrative unit in the
+   locality field ("District 1", "Ward 3", "Township of X") instead of a town
+   name. Reject those and fall back to a real place name. */
+function looksAdministrative(s){
+  if(!s) return true;
+  return /^(district|ward|precinct|township|unorganized|census|division|subdivision|borough of|town of|city of)\b/i.test(s.trim())
+      || /\b(district|ward|precinct)\s*\d+/i.test(s)
+      || /^\d+$/.test(s.trim());
+}
+
+function bestPlaceName(d){
+  const candidates = [d.locality, d.city];
+  // localityInfo.administrative is ordered broad -> specific; walk it backwards
+  // and take the most specific entry that reads like an actual place.
+  const admin = (d.localityInfo && d.localityInfo.administrative) || [];
+  for(let i = admin.length - 1; i >= 0; i--) candidates.push(admin[i] && admin[i].name);
+  const infoPlaces = (d.localityInfo && d.localityInfo.informative) || [];
+  for(const p of infoPlaces) candidates.push(p && p.name);
+
+  for(const c of candidates){
+    if(c && !looksAdministrative(c)) return c;
+  }
+  return d.city || d.locality || null;
+}
+
 /* ============ geocoding search ============ */
 const locInput = document.getElementById('locInput');
 const suggestBox = document.getElementById('suggestions');
@@ -396,21 +451,7 @@ async function runSearch(q){
 document.getElementById('locBtn').addEventListener('click', ()=>{
   if(!navigator.geolocation){ setStatus('Geolocation not supported on this device.'); return; }
   setStatus('Locating…');
-  navigator.geolocation.getCurrentPosition(async (pos)=>{
-    const {latitude, longitude} = pos.coords;
-    let label = 'Current Location';
-    try{
-      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-      const d = await r.json();
-      // locality is the actual town (Pearl); city is often the metro name (Jackson).
-      const town = d.locality || d.city;
-      const st = d.principalSubdivisionCode ? (d.principalSubdivisionCode.split('-')[1] || d.principalSubdivision) : d.principalSubdivision;
-      label = [town, st].filter(Boolean).join(', ') || label;
-    }catch(e){}
-    locInput.value = label;
-    loadLocation(latitude, longitude, label);
-  }, ()=>{ setStatus('Location access denied — search for a city instead.'); },
-  {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+  locateAndLoad({onFail: ()=> setStatus('Location access denied — search for a city instead.')});
 });
 
 /* ============ unit toggle ============ */
@@ -466,8 +507,47 @@ function render(data){
   document.getElementById('statHiLo').textContent =
     cToDisplay(data.daily.temperature_2m_max[0])+'° / '+cToDisplay(data.daily.temperature_2m_min[0])+'°';
 
+  renderSun(data);
+  if(window.setAmbient){
+    window.setAmbient(c.weather_code, c.is_day === 1, c.temperature_2m);
+  }
   renderHourly(data);
   renderDaily(data);
+}
+
+function renderSun(data){
+  const rise = data.daily.sunrise && data.daily.sunrise[0];
+  const set  = data.daily.sunset  && data.daily.sunset[0];
+  if(!rise || !set) return;
+
+  const hm = s => {
+    const h = parseInt(s.slice(11,13),10), m = s.slice(14,16);
+    const ap = h < 12 ? 'AM' : 'PM';
+    return `${h%12===0?12:h%12}:${m} ${ap}`;
+  };
+  document.getElementById('sunriseT').textContent = hm(rise);
+  document.getElementById('sunsetT').textContent  = hm(set);
+
+  // Progress through daylight, using the location's own clock.
+  const mins = s => parseInt(s.slice(11,13),10)*60 + parseInt(s.slice(14,16),10);
+  const nowStr = (data.current && data.current.time) || rise;
+  const now = mins(nowStr), r = mins(rise), st = mins(set);
+  let pct = (now - r) / Math.max(1, st - r);
+  pct = Math.min(1, Math.max(0, pct));
+
+  const path = document.getElementById('sunArcFill');
+  const len = path.getTotalLength();
+  path.setAttribute('stroke-dasharray', len);
+  path.setAttribute('stroke-dashoffset', len * (1 - pct));
+  const p = path.getPointAtLength(len * pct);
+  const dot = document.getElementById('sunDot');
+  dot.setAttribute('cx', p.x);
+  dot.setAttribute('cy', p.y);
+  // Dim the marker outside daylight hours.
+  dot.setAttribute('fill', (now < r || now > st) ? '#4a5068' : '#f2a93b');
+
+  // Hand the phase to the background engine.
+  window.__wxSun = {rise:r, set:st, now, pct, isDay: now >= r && now <= st};
 }
 
 function renderHourly(data){
@@ -666,35 +746,237 @@ document.getElementById('playBtn').addEventListener('click', () => {
   radarPlaying ? pauseRadar() : playRadar();
 });
 
+
+/* ============ ambient background ============
+   Canvas particles for precipitation + a sky tint driven by sun position.
+   Honors prefers-reduced-motion and pauses when the app is backgrounded. */
+(function ambient(){
+  const canvas = document.getElementById('wxCanvas');
+  const tint = document.getElementById('wxTint');
+  if(!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let W=0, H=0, dpr=1, particles=[], mode='clear', intensity=1, raf=null, flash=0, nextFlash=0;
+
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    build();
+  }
+  window.addEventListener('resize', resize);
+
+  const rand = (a,b) => a + Math.random()*(b-a);
+
+  function build(){
+    particles = [];
+    if(mode === 'rain' || mode === 'storm'){
+      const n = Math.round((mode==='storm'?90:60) * intensity);
+      for(let i=0;i<n;i++) particles.push({
+        x:rand(0,W), y:rand(-H,H), len:rand(10,26)*intensity,
+        sp:rand(6,13)*intensity, w:rand(0.7,1.5), a:rand(0.12,0.4)
+      });
+    } else if(mode === 'snow'){
+      const n = Math.round(70*intensity);
+      for(let i=0;i<n;i++) particles.push({
+        x:rand(0,W), y:rand(-H,H), r:rand(1.2,3.4),
+        sp:rand(0.4,1.5), sway:rand(0.4,1.6), ph:rand(0,Math.PI*2), a:rand(0.25,0.7)
+      });
+    } else if(mode === 'heat'){
+      for(let i=0;i<26;i++) particles.push({
+        x:rand(0,W), y:rand(0,H), r:rand(24,70),
+        sp:rand(0.12,0.4), ph:rand(0,Math.PI*2), a:rand(0.02,0.06)
+      });
+    } else if(mode === 'fog'){
+      for(let i=0;i<9;i++) particles.push({
+        x:rand(-W*0.3,W), y:rand(0,H), w:rand(W*0.5,W*1.2), h:rand(50,130),
+        sp:rand(0.08,0.3), a:rand(0.02,0.055)
+      });
+    } else if(mode === 'stars'){
+      for(let i=0;i<60;i++) particles.push({
+        x:rand(0,W), y:rand(0,H*0.75), r:rand(0.5,1.5),
+        ph:rand(0,Math.PI*2), tw:rand(0.008,0.03), a:rand(0.25,0.8)
+      });
+    } else if(mode === 'cloudy'){
+      for(let i=0;i<7;i++) particles.push({
+        x:rand(-W*0.2,W), y:rand(0,H*0.8), r:rand(70,150),
+        sp:rand(0.05,0.18), a:rand(0.025,0.05)
+      });
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    if(mode==='rain' || mode==='storm'){
+      ctx.lineCap='round';
+      for(const p of particles){
+        ctx.strokeStyle = `rgba(150,200,225,${p.a})`;
+        ctx.lineWidth = p.w;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.len*0.18, p.y + p.len);
+        ctx.stroke();
+        p.y += p.sp; p.x -= p.sp*0.18;
+        if(p.y > H){ p.y = rand(-60,-5); p.x = rand(0,W); }
+      }
+      if(mode==='storm'){
+        nextFlash--;
+        if(nextFlash <= 0){ flash = 1; nextFlash = Math.round(rand(180,600)); }
+        if(flash > 0){
+          ctx.fillStyle = `rgba(200,220,255,${flash*0.13})`;
+          ctx.fillRect(0,0,W,H);
+          flash -= 0.06;
+        }
+      }
+    } else if(mode==='snow'){
+      for(const p of particles){
+        p.ph += 0.01;
+        ctx.fillStyle = `rgba(235,242,255,${p.a})`;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.sin(p.ph)*p.sway*7, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        p.y += p.sp;
+        if(p.y > H+5){ p.y = rand(-40,-5); p.x = rand(0,W); }
+      }
+    } else if(mode==='heat'){
+      for(const p of particles){
+        p.ph += 0.012;
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+        g.addColorStop(0, `rgba(242,169,59,${p.a})`);
+        g.addColorStop(1, 'rgba(242,169,59,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.sin(p.ph)*10, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        p.y -= p.sp;
+        if(p.y < -p.r){ p.y = H + p.r; p.x = rand(0,W); }
+      }
+    } else if(mode==='fog'){
+      for(const p of particles){
+        const g = ctx.createLinearGradient(p.x,0,p.x+p.w,0);
+        g.addColorStop(0,'rgba(170,180,200,0)');
+        g.addColorStop(0.5,`rgba(170,180,200,${p.a})`);
+        g.addColorStop(1,'rgba(170,180,200,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        p.x += p.sp;
+        if(p.x > W){ p.x = -p.w; p.y = rand(0,H); }
+      }
+    } else if(mode==='stars'){
+      for(const p of particles){
+        p.ph += p.tw;
+        const a = p.a * (0.55 + 0.45*Math.sin(p.ph));
+        ctx.fillStyle = `rgba(220,230,255,${a})`;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      }
+    } else if(mode==='cloudy'){
+      for(const p of particles){
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+        g.addColorStop(0, `rgba(150,160,185,${p.a})`);
+        g.addColorStop(1, 'rgba(150,160,185,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+        p.x += p.sp;
+        if(p.x - p.r > W){ p.x = -p.r; p.y = rand(0,H*0.8); }
+      }
+    }
+
+    raf = requestAnimationFrame(draw);
+  }
+
+  function start(){ if(!raf && !reduced) raf = requestAnimationFrame(draw); }
+  function stop(){ if(raf){ cancelAnimationFrame(raf); raf = null; } }
+  document.addEventListener('visibilitychange', ()=> document.hidden ? stop() : start());
+
+  // --- sky tint by sun phase ---
+  function skyTint(){
+    const s = window.__wxSun;
+    if(!s) return 'linear-gradient(180deg, rgba(20,24,34,0.6), rgba(18,20,26,0))';
+    const {now, rise, set} = s;
+    const dawnA = rise - 45, dawnB = rise + 45;
+    const duskA = set - 55,  duskB = set + 50;
+    if(now >= dawnA && now <= dawnB)
+      return 'linear-gradient(180deg, rgba(255,140,90,0.22), rgba(120,90,160,0.10) 45%, rgba(18,20,26,0))';
+    if(now >= duskA && now <= duskB)
+      return 'linear-gradient(180deg, rgba(255,110,60,0.26), rgba(150,70,130,0.12) 45%, rgba(18,20,26,0))';
+    if(now > dawnB && now < duskA)
+      return 'linear-gradient(180deg, rgba(90,160,220,0.13), rgba(18,20,26,0) 55%)';
+    return 'linear-gradient(180deg, rgba(25,35,70,0.30), rgba(18,20,26,0) 60%)';
+  }
+
+  // --- pick a mode from the weather code ---
+  window.setAmbient = function(code, isDay, tempC){
+    let m = 'clear', inten = 1;
+    if([51,53,55,56,57].includes(code)){ m='rain'; inten=0.55; }
+    else if([61,66,80].includes(code)){ m='rain'; inten=0.85; }
+    else if([63,81].includes(code)){ m='rain'; inten=1.15; }
+    else if([65,67,82].includes(code)){ m='rain'; inten=1.6; }
+    else if([95,96,99].includes(code)){ m='storm'; inten=1.5; }
+    else if([71,73,75,77,85,86].includes(code)){ m='snow'; inten = code===75?1.5:1; }
+    else if([45,48].includes(code)){ m='fog'; }
+    else if(code===3){ m='cloudy'; }
+    else if([1,2].includes(code)){ m = isDay ? 'clear' : 'stars'; }
+    else if(code===0){
+      if(!isDay) m='stars';
+      else if(typeof tempC === 'number' && tempC >= 32) m='heat';  // ~90F+
+      else m='clear';
+    }
+    if(m !== mode || Math.abs(inten - intensity) > 0.01){
+      mode = m; intensity = inten; build();
+    }
+    tint.style.background = skyTint();
+    tint.style.opacity = '1';
+    if(mode === 'clear'){ stop(); ctx.clearRect(0,0,W,H); } else start();
+  };
+
+  resize();
+})();
+
 /* ============ boot ============ */
+
+// Shared geolocation routine: resolve coords -> place name -> load forecast.
+function locateAndLoad({onFail} = {}){
+  if(!navigator.geolocation){ if(onFail) onFail(); return; }
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    const {latitude, longitude} = pos.coords;
+    let label = 'Current Location';
+    try{
+      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+      const d = await r.json();
+      const town = bestPlaceName(d);
+      const st = d.principalSubdivisionCode ? (d.principalSubdivisionCode.split('-')[1] || d.principalSubdivision) : d.principalSubdivision;
+      label = [town, st].filter(Boolean).join(', ') || label;
+    }catch(e){}
+    locInput.value = label;
+    loadLocation(latitude, longitude, label);
+  }, ()=>{ if(onFail) onFail(); },
+  {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+}
+
 (function boot(){
   const savedLat = localStorage.getItem('wx_lat');
   const savedLon = localStorage.getItem('wx_lon');
   const savedLabel = localStorage.getItem('wx_label');
+
+  // Paint the last known location immediately so there is no blank screen,
+  // then refresh from GPS every time the app opens.
   if(savedLat && savedLon){
     locInput.value = savedLabel || '';
     loadLocation(parseFloat(savedLat), parseFloat(savedLon), savedLabel || 'Saved location');
-  } else if(navigator.geolocation){
-    setStatus('Locating…');
-    navigator.geolocation.getCurrentPosition(async (pos)=>{
-      const {latitude, longitude} = pos.coords;
-      let label = 'Current Location';
-      try{
-        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-        const d = await r.json();
-        const town = d.locality || d.city;
-        const st = d.principalSubdivisionCode ? (d.principalSubdivisionCode.split('-')[1] || d.principalSubdivision) : d.principalSubdivision;
-        label = [town, st].filter(Boolean).join(', ') || label;
-      }catch(e){}
-      locInput.value = label;
-      loadLocation(latitude, longitude, label);
-    }, ()=>{
-      setStatus('Search for a city to get started.');
-    }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+    locateAndLoad();   // silent refresh; keeps the saved view if GPS fails
   } else {
-    setStatus('Search for a city to get started.');
+    setStatus('Locating…');
+    locateAndLoad({onFail: ()=> setStatus('Search for a city to get started.')});
   }
 })();
+
+// Re-check location when the app is brought back to the foreground.
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible') locateAndLoad();
+});
 
 // Service worker removed. It was intercepting and caching requests, which
 // served stale tiles and could block live API calls. Actively unregister any
