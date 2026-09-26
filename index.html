@@ -270,7 +270,7 @@
   <div class="daily-list" id="dailyList"></div>
 
   <div class="status" id="statusMsg" style="display:none;"></div>
-  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.28</footer>
+  <footer>NO ADS · NO TRACKING · OPEN-METEO + RAINVIEWER · BUILD 2026-09-05.29</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -850,36 +850,36 @@ document.getElementById('playBtn').addEventListener('click', () => {
   function build(){
     particles = [];
     if(mode === 'rain' || mode === 'storm'){
-      const n = Math.round((mode==='storm'?90:60) * intensity);
+      const n = Math.round((mode==='storm'?150:105) * intensity);
       for(let i=0;i<n;i++) particles.push({
-        x:rand(0,W), y:rand(-H,H), len:rand(10,26)*intensity,
-        sp:rand(6,13)*intensity, w:rand(0.7,1.5), a:rand(0.12,0.4)
+        x:rand(0,W), y:rand(-H,H), len:rand(14,34)*intensity,
+        sp:rand(7,15)*intensity, w:rand(0.9,1.9), a:rand(0.22,0.6)
       });
     } else if(mode === 'snow'){
-      const n = Math.round(70*intensity);
+      const n = Math.round(115*intensity);
       for(let i=0;i<n;i++) particles.push({
-        x:rand(0,W), y:rand(-H,H), r:rand(1.2,3.4),
-        sp:rand(0.4,1.5), sway:rand(0.4,1.6), ph:rand(0,Math.PI*2), a:rand(0.25,0.7)
+        x:rand(0,W), y:rand(-H,H), r:rand(1.4,4.2),
+        sp:rand(0.5,1.8), sway:rand(0.4,1.8), ph:rand(0,Math.PI*2), a:rand(0.4,0.95)
       });
     } else if(mode === 'heat'){
-      for(let i=0;i<26;i++) particles.push({
-        x:rand(0,W), y:rand(0,H), r:rand(24,70),
-        sp:rand(0.12,0.4), ph:rand(0,Math.PI*2), a:rand(0.02,0.06)
+      for(let i=0;i<40;i++) particles.push({
+        x:rand(0,W), y:rand(0,H), r:rand(30,86),
+        sp:rand(0.14,0.5), ph:rand(0,Math.PI*2), a:rand(0.05,0.13)
       });
     } else if(mode === 'fog'){
-      for(let i=0;i<9;i++) particles.push({
-        x:rand(-W*0.3,W), y:rand(0,H), w:rand(W*0.5,W*1.2), h:rand(50,130),
-        sp:rand(0.08,0.3), a:rand(0.02,0.055)
+      for(let i=0;i<14;i++) particles.push({
+        x:rand(-W*0.3,W), y:rand(0,H), w:rand(W*0.5,W*1.2), h:rand(60,150),
+        sp:rand(0.1,0.36), a:rand(0.05,0.11)
       });
     } else if(mode === 'stars'){
-      for(let i=0;i<60;i++) particles.push({
-        x:rand(0,W), y:rand(0,H*0.75), r:rand(0.5,1.5),
-        ph:rand(0,Math.PI*2), tw:rand(0.008,0.03), a:rand(0.25,0.8)
+      for(let i=0;i<105;i++) particles.push({
+        x:rand(0,W), y:rand(0,H*0.8), r:rand(0.6,1.9),
+        ph:rand(0,Math.PI*2), tw:rand(0.008,0.035), a:rand(0.4,1)
       });
     } else if(mode === 'cloudy'){
-      for(let i=0;i<7;i++) particles.push({
-        x:rand(-W*0.2,W), y:rand(0,H*0.8), r:rand(70,150),
-        sp:rand(0.05,0.18), a:rand(0.025,0.05)
+      for(let i=0;i<11;i++) particles.push({
+        x:rand(-W*0.2,W), y:rand(0,H*0.8), r:rand(80,175),
+        sp:rand(0.06,0.22), a:rand(0.055,0.1)
       });
     }
   }
@@ -890,7 +890,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
     if(mode==='rain' || mode==='storm'){
       ctx.lineCap='round';
       for(const p of particles){
-        ctx.strokeStyle = `rgba(150,200,225,${p.a})`;
+        ctx.strokeStyle = `rgba(170,215,240,${p.a})`;
         ctx.lineWidth = p.w;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
@@ -901,9 +901,9 @@ document.getElementById('playBtn').addEventListener('click', () => {
       }
       if(mode==='storm'){
         nextFlash--;
-        if(nextFlash <= 0){ flash = 1; nextFlash = Math.round(rand(180,600)); }
+        if(nextFlash <= 0){ flash = 1; nextFlash = Math.round(rand(90,300)); }
         if(flash > 0){
-          ctx.fillStyle = `rgba(200,220,255,${flash*0.13})`;
+          ctx.fillStyle = `rgba(210,228,255,${flash*0.26})`;
           ctx.fillRect(0,0,W,H);
           flash -= 0.06;
         }
@@ -911,7 +911,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
     } else if(mode==='snow'){
       for(const p of particles){
         p.ph += 0.01;
-        ctx.fillStyle = `rgba(235,242,255,${p.a})`;
+        ctx.fillStyle = `rgba(240,246,255,${p.a})`;
         ctx.beginPath();
         ctx.arc(p.x + Math.sin(p.ph)*p.sway*7, p.y, p.r, 0, Math.PI*2);
         ctx.fill();
@@ -976,12 +976,12 @@ document.getElementById('playBtn').addEventListener('click', () => {
     const dawnA = rise - 45, dawnB = rise + 45;
     const duskA = set - 55,  duskB = set + 50;
     if(now >= dawnA && now <= dawnB)
-      return 'linear-gradient(180deg, rgba(255,140,90,0.22), rgba(120,90,160,0.10) 45%, rgba(18,20,26,0))';
+      return 'linear-gradient(180deg, rgba(255,140,90,0.38), rgba(120,90,160,0.20) 45%, rgba(18,20,26,0))';
     if(now >= duskA && now <= duskB)
-      return 'linear-gradient(180deg, rgba(255,110,60,0.26), rgba(150,70,130,0.12) 45%, rgba(18,20,26,0))';
+      return 'linear-gradient(180deg, rgba(255,110,60,0.44), rgba(150,70,130,0.22) 45%, rgba(18,20,26,0))';
     if(now > dawnB && now < duskA)
-      return 'linear-gradient(180deg, rgba(90,160,220,0.13), rgba(18,20,26,0) 55%)';
-    return 'linear-gradient(180deg, rgba(25,35,70,0.30), rgba(18,20,26,0) 60%)';
+      return 'linear-gradient(180deg, rgba(90,160,220,0.24), rgba(18,20,26,0) 58%)';
+    return 'linear-gradient(180deg, rgba(25,40,85,0.48), rgba(18,20,26,0) 62%)';
   }
 
   // --- pick a mode from the weather code ---
